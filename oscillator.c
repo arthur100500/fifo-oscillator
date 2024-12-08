@@ -6,7 +6,14 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#define FIFO_FILE "./osc.fifo"
+#define FIFO_FILE_ONE "./osc12.fifo"
+#define FIFO_FILE_TWO "./osc21.fifo"
+
+void print_with_pid(const char *msg)
+{
+    printf("[%d] %s\n", getpid(), msg);
+    fflush(stdout);
+}
 
 void create_file(const char *path)
 {
@@ -28,54 +35,56 @@ void create_file(const char *path)
     printf("Fifo file created\n");
 }
 
-void wait(const char *fifo_path)
+void wait(int fifo_in)
 {
     char buffer[128];
+    read(fifo_in, buffer, sizeof(buffer));
+}
 
-    int fifo = open(fifo_path, O_RDONLY);
+void send(int fifo_out)
+{
+    write(fifo_out, "wake up", 7);
+}
 
+int fifo_open(const char *path, int flags)
+{
+    int fifo = open(path, flags);
     if (fifo == -1)
     {
         perror("Unable to open file");
         exit(1);
     }
-
-    read(fifo, buffer, sizeof(buffer));
-
-    close(fifo);
+    return fifo;
 }
 
-void send(const char *fifo_path)
+void oscillate(const char *fifo_in, const char *fifo_out, int starting)
 {
-    int fifo = open(fifo_path, O_WRONLY);
+    int in_fd, out_fd;
 
-    if (fifo == -1)
+    if (starting)
     {
-        perror("Unable to open file");
-        exit(1);
+        out_fd = fifo_open(fifo_out, O_WRONLY);
+        in_fd = fifo_open(fifo_in, O_RDONLY);
+    }
+    else
+    {
+        in_fd = fifo_open(fifo_in, O_RDONLY);
+        out_fd = fifo_open(fifo_out, O_WRONLY);
     }
 
-    printf("[%d] Writing fifo...\n", getpid());
-    fflush(stdout);
-    write(fifo, "wake up", 7);
-
-    close(fifo);
-}
-
-void oscillate(const char *fifo_path, int starting)
-{
     if (!starting)
-        wait(fifo_path);
+        wait(in_fd);
 
     while (1)
     {
         sleep(1);
-        send(fifo_path);
-        wait(fifo_path);
+        print_with_pid(starting ? "ping" : "pong");
+        send(out_fd);
+        wait(in_fd);
     }
 }
 
-void fork_and_run(const char *fifo_path)
+void fork_and_run(const char *fifo_12, const char *fifo_21)
 {
     pid_t pid = fork();
 
@@ -85,11 +94,15 @@ void fork_and_run(const char *fifo_path)
         exit(1);
     }
 
-    oscillate(fifo_path, pid == 0);
+    if (pid == 0)
+        oscillate(fifo_12, fifo_21, 1);
+    else
+        oscillate(fifo_21, fifo_12, 0);
 }
 
 int main(void)
 {
-    create_file(FIFO_FILE);
-    fork_and_run(FIFO_FILE);
+    create_file(FIFO_FILE_ONE);
+    create_file(FIFO_FILE_TWO);
+    fork_and_run(FIFO_FILE_ONE, FIFO_FILE_TWO);
 }
