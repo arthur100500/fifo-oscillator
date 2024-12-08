@@ -1,2 +1,2 @@
 all:
-	gcc -Wall oscillator.c
+	gcc -Wall -o oscillator oscillator.c
