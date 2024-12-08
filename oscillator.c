@@ -5,9 +5,12 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <signal.h>
 
 #define FIFO_FILE_ONE "./osc12.fifo"
 #define FIFO_FILE_TWO "./osc21.fifo"
+
+static int fds_to_close[] = {0, 0};
 
 void print_with_pid(const char *msg)
 {
@@ -100,8 +103,20 @@ void fork_and_run(const char *fifo_12, const char *fifo_21)
         oscillate(fifo_21, fifo_12, 0);
 }
 
+void cleanup(int signum)
+{
+    print_with_pid("Terminating and closing all file descriptors");
+
+    for (int i = 0; i < 2; i++)
+        if (fds_to_close[i] > 0)
+            close(fds_to_close[i]);
+
+    exit(0);
+}
+
 int main(void)
 {
+    signal(SIGINT, cleanup);
     create_file(FIFO_FILE_ONE);
     create_file(FIFO_FILE_TWO);
     fork_and_run(FIFO_FILE_ONE, FIFO_FILE_TWO);
