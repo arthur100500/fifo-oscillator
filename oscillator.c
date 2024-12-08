@@ -105,4 +105,6 @@ int main(void)
     create_file(FIFO_FILE_ONE);
     create_file(FIFO_FILE_TWO);
     fork_and_run(FIFO_FILE_ONE, FIFO_FILE_TWO);
+
+    return 0;
 }
